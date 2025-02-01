@@ -1,0 +1,16 @@
+# Ignorera allt
+*
+
+# För att inte ignorera .gitignore och .py-filer
+!.gitignore
+!*.py
+
+# Ignorera IDE-specifika filer och kataloger
+.idea/
+.vscode/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+
