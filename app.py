@@ -10,17 +10,29 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from datetime import datetime
 
 class FinanceApp(QMainWindow):
+    start_x = 300
+    start_y = 300
+    end_x = 1200
+    end_y = 700
+
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Ekonomi-app")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(self.start_x, self.start_y, self.end_x, self.end_y)
 
-        self.init_db()
+        FinanceApp.init_db(self)
         self.init_ui()
 
+        # Ladda transaktionerna när appen startar
+        self.load_transactions()
+
+        # Rita grafen när appen startar
+        self.plot_graph()
+
+    @staticmethod
     def init_db(self):
-        """Skapar en SQLite-databas om den inte finns."""
+        """Skapar en SQLite-databas om den inte finns och ber om ett startvärde om den är tom."""
         conn = sqlite3.connect("finance.db")
         cursor = conn.cursor()
         cursor.execute("""
@@ -34,6 +46,17 @@ class FinanceApp(QMainWindow):
             )
         """)
         conn.commit()
+
+        cursor.execute("SELECT COUNT(*) FROM transactions")
+        if cursor.fetchone()[0] == 0:
+            start_balance, ok = QInputDialog.getDouble(self, "Startsaldo", "Ange startvärde för saldot:", 0, 0, 1000000,
+                                                       2)
+            if ok:
+                cursor.execute("INSERT INTO transactions (type, amount, date, time, balance) VALUES (?, ?, ?, ?, ?)",
+                               ("Startsaldo", start_balance, datetime.now().strftime("%Y-%m-%d"),
+                                datetime.now().strftime("%H:%M:%S"), start_balance))
+                conn.commit()
+
         conn.close()
 
     def init_ui(self):
@@ -127,17 +150,31 @@ class FinanceApp(QMainWindow):
         """Ritar en graf över saldot."""
         conn = sqlite3.connect("finance.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT type, amount, date, time, balance FROM transactions ORDER BY date ASC, time ASC")
+
+        # Hämta det senaste saldot (det första startvärdet)
+        cursor.execute("SELECT balance FROM transactions ORDER BY id ASC LIMIT 1")
+        result = cursor.fetchone()
+        conn.close()
+
+        # Om ingen transaktion finns, använd ett default startvärde (t.ex. 0 eller annat valfritt värde)
+        if result:
+            balance = result[0]
+        else:
+            balance = 0  # Eller något annat lämpligt default-värde
+
+        # Börja lista med startvärdet
+        dates = ["Start"]
+        balances = [balance]
+
+        # Hämta alla transaktioner och deras saldon
+        conn = sqlite3.connect("finance.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT date, time, balance FROM transactions ORDER BY date ASC, time ASC")
         transactions = cursor.fetchall()
         conn.close()
 
-        # Startsaldo
-        balance = 8600
-        dates = ["Start"]  # Startdatum i grafen
-        balances = [balance]
-
-        # Lägg till transaktioner i grafen
-        for trans_type, amount, date, time, balance in transactions:
+        # Lägg till alla transaktioner i grafen
+        for date, time, balance in transactions:
             dates.append(f"{date} {time}")
             balances.append(balance)
 
